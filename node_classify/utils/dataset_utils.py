@@ -330,9 +330,10 @@ def DataLoader(name, args):
         HL_sparse_tensor = data.HL[i+1]  # 这里选择HL中的第一个稀疏张量进行SVD分解
         # 将稀疏张量转换为稠密张量
         dense_tensor = HL_sparse_tensor.to_dense()
+        L = torch.eye(dense_tensor.shape[0]) - dense_tensor
 
         # 使用torch.svd函数进行SVD分解
-        U, S, V = torch.svd(dense_tensor)
+        U, S, V = torch.svd(L)
         #print("U",U.shape)
         #print("S",S.shape)
 
