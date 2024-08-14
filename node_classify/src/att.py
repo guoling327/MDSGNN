@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 width=0.20
 
 name_list = ['Cora','Citeseer', 'Photo','Computers', 'Cornell', 'Chameleon', 'Wisconsin', 'Texas', 'Squirrel' ,'Actor']
-num_list1 = [89.18,	80.90,	95.18,	91.05,	91.64,	70.72,	94.50,	93.61,	59.91,	41.07]
+num_list1 = [88.91,	81.17,	95.18,	91.05,	91.64,	70.72,	94.50,	93.61,	59.91,	41.07]
 num_list2 = [87.73,	78.92,	85.36,	90.65,	84.26,	66.61,	91.50,	91.48,	37.10,	41.02]
 num_list3 = [88.05,	79.90,	89.07,	90.71,	88.85,	64.62,	87.63,	92.13,	37.20,	40.10]
 
