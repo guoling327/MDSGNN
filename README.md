@@ -17,18 +17,13 @@ numpy
 # Exp1: Node Classification 
 go to folder `./node_classify/src`
 
-## Run experiment with Cora:
+## Run experiment with Citeseer:
 
 
 ```sh
 cd node_classify/src
-python run_node_exp.py --RPMAX 100 \
-        --net MDSGNN\
-        --dataset cora \
-        --lr 0.1 \
-        --alpha 0.5 \
-        --weight_decay 0.001 \
-        --dprate 0.3
+python run_node_exp.py    --dataset citeseer         --cuda 2   --net MDSGNN        --Order 2    --lr 0.005      --dropout 0.7  --weight_decay 5e-3  --alpha 0.5
+
 ```
 
 Before the training commences, the script will download and preprocess the respective graph datasets. 
