@@ -40,10 +40,8 @@ class FourierEncoding(nn.Module):
             eeig = torch.cat((eeig, cos), dim=1)
 
         out_e = self.eig_w(eeig).to(e.device)
-        #div = torch.exp(torch.arange(0, self.hidden_dim, 2) * (-math.log(10000) / self.hidden_dim)).to(e.device)
-       # pe = ee.unsqueeze(1) * div
-        #eee = torch.exp(-2.0*e)
-        #eeig = torch.cat((torch.sin(pe), torch.cos(pe)), dim=1)
+
+        out_e =torch.sigmoid(out_e)
 
         return out_e
 
@@ -151,14 +149,15 @@ class MDSGNN_Message(MessagePassing):
             Parameter(torch.FloatTensor(1 * hidden, 1).to(self.device)),
         )
         self.att_vec = Parameter(torch.FloatTensor(3, 3).to(self.device))
-        self.att2_vec = Parameter(torch.FloatTensor(2, 2).to(self.device))
-        self.att4_vec = Parameter(torch.FloatTensor(4, 4).to(self.device))
+
         self.reset_parameters()
 
     def reset_parameters(self):
+        torch.nn.init.zeros_(self.fW)
+        for k in range(self.K + 1):
+            self.fW.data[k] = self.alpha * (1 - self.alpha) ** k
+        self.fW.data[-1] = (1 - self.alpha) ** self.K
 
-        std_att = 1.0 / math.sqrt(self.att_vec_2.size(1))
-        std_att_vec = 1.0 / math.sqrt(self.att_vec.size(1))
 
         std_att = 1.0 / math.sqrt(self.att_vec_2.size(1))
         std_att_vec = 1.0 / math.sqrt(self.att_vec.size(1))
@@ -166,30 +165,9 @@ class MDSGNN_Message(MessagePassing):
         self.att_vec_1.data.uniform_(-std_att, std_att)
         self.att_vec_0.data.uniform_(-std_att, std_att)
         self.att_vec_2.data.uniform_(-std_att, std_att)
-        self.att_vec_3.data.uniform_(-std_att, std_att)
 
         self.att_vec.data.uniform_(-std_att_vec, std_att_vec)
-        self.att2_vec.data.uniform_(-std_att_vec, std_att_vec)
-        self.att4_vec.data.uniform_(-std_att_vec, std_att_vec)
 
-    def attention2(self, output_0, output_1):
-        logits = (
-            torch.mm(
-                torch.sigmoid(
-                    torch.cat(
-                        [
-                            torch.mm((output_0), self.att_vec_0),
-                            torch.mm((output_1), self.att_vec_1),
-
-                        ],
-                        1,
-                    )
-                ),
-                self.att2_vec,
-            )
-        )
-        att = torch.softmax(logits, 1)
-        return att[:, 0][:, None], att[:, 1][:, None]
 
     def attention3(self, output_0, output_1, output_2):
         logits = (
@@ -209,26 +187,6 @@ class MDSGNN_Message(MessagePassing):
         )
         att = torch.softmax(logits, 1)
         return att[:, 0][:, None], att[:, 1][:, None], att[:, 2][:, None]
-
-    def attention4(self, output_0, output_1, output_2, output_3):
-        logits = (
-            torch.mm(
-                torch.sigmoid(
-                    torch.cat(
-                        [
-                            torch.mm((output_0), self.att_vec_0),
-                            torch.mm((output_1), self.att_vec_1),
-                            torch.mm((output_2), self.att_vec_2),
-                            torch.mm((output_3), self.att_vec_3),
-                        ],
-                        1,
-                    )
-                ),
-                self.att4_vec,
-            )
-        )
-        att = torch.softmax(logits, 1)
-        return att[:, 0][:, None], att[:, 1][:, None], att[:, 2][:, None], att[:, 3][:, None]
 
 
     def forward(self, data,e,u):
@@ -277,23 +235,7 @@ class MDSGNN_Message(MessagePassing):
 
             result.append(h)
 
-
-        if self.Order == 2:
-            self.att_0, self.att_1, self.att_2 = self.attention3((result[0]), (result[1]), (result[2]))
-            # print(self.att_0.size())
-            h = self.att_0 * result[0] + self.att_1 * result[1] + self.att_2 * result[2]
-        elif self.Order == 1:
-            self.att_0, self.att_1= self.attention2((result[0]), (result[1]))
-            # print(self.att_0.size())
-            h = self.att_0 * result[0] + self.att_1 * result[1]
-        elif self.Order == 3:
-            self.att_0, self.att_1, self.att_2, self.att_3 = self.attention4((result[0]), (result[1]), (result[2]), (result[3]))
-            # print(self.att_0.size())
-            h = self.att_0 * result[0] + self.att_1 * result[1] + self.att_2 * result[2] + self.att_3 * result[3]
-        else:
-            h = torch.sum(torch.stack(result), dim=0)
-
-
+        self.att_0, self.att_1, self.att_2, self.att_3 = self.attention4((result[0]), (result[1]), (result[2]), (result[3])
         h=self.lin3(h)
 
         return F.log_softmax(h, dim=1)
@@ -350,16 +292,17 @@ class MDSGNN(torch.nn.Module):
         U_list = []
         for i in range(self.order):
             HL_sparse_tensor = HL[i+1]
-            # dense_tensor = HL_sparse_tensor.to_dense()
-            #
-            # HL_sparse_tensor = data.HL[i + 1]  # 这里选择HL中的第一个稀疏张量进行SVD分解
-            # 将稀疏张量转换为稠密张量
-            # dense_tensor = HL_sparse_tensor.to_dense()
             dense_tensor = HL_sparse_tensor.to_dense()
-            dense_tensor = dense_tensor.float()
+            L = torch.eye(dense_tensor.shape[0]) - dense_tensor
+
+            # # 使用torch.svd函数进行SVD分解
+            # U, S, V = torch.svd(L)
+            # # print("U",U.shape)
+            # dense_tensor = HL_sparse_tensor.to_dense()
+            L = L.float()
 
           #  L = torch.eye(dense_tensor.shape[0]) - dense_tensor  是否需要单位阵减
-            U, S, V = torch.svd(dense_tensor)
+            U, S, V = torch.svd(L)
 
             S_list.append(S.to(self.device))
             U_list.append(U.to(self.device))
