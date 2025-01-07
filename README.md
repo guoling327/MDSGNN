@@ -1,1 +1,1 @@
-## The codes of MDSGNN are in the branch master.
+## The codes of MFNN are in the branch master.
